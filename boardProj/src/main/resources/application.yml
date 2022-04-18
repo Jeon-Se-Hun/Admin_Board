@@ -1,0 +1,28 @@
+server:
+  port: 8088
+        
+spring :
+  #### DB
+  datasource : 
+    driver-class-name : oracle.jdbc.OracleDriver
+    url : jdbc:oracle:thin:@localhost:1521/xe
+    username : project1
+    password : project1
+  
+  ### 내용 갱신 시 서버 reloading
+  devtools :
+    livereload :
+      enabled : true
+      
+  ### view page
+  mvc : 
+    view :
+      prefix : /views/
+      suffix : .jsp
+      
+###mybatis 설정
+
+mybatis:
+  mapper-locations: mapper/**/*.xml
+  type-aliases-package: com.example.demo.mapper/**
+  

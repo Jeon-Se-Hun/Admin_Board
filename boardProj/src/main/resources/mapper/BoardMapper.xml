@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!DOCTYPE mapper 
+PUBLIC "-//mybatis.org/DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.demo.mapper.BoardMapper">
+	
+	<select id="list" resultType="HashMap">
+		SELECT
+			TMP.*
+		FROM
+			(SELECT
+				ROW_NUMBER() OVER (ORDER BY BOR_ORDER DESC) AS NUM
+				,BOR_KEY_ID
+				,TITLE
+				,(SELECT NICKNAME FROM MEMBER WHERE PID = board.PID) AS PID
+				,VIEW_CNT
+				,TO_CHAR(REG_DATE, 'YYYY-MM-DD') AS REG_DATE
+				,BOR_ORDER
+			FROM
+				BOARD board
+			WHERE
+				DEL_YN = 'N'
+			ORDER BY 
+				BOR_ORDER DESC
+			)TMP
+	<if test="firstRecordIndex !=null and lastRecordIndex != null">
+      WHERE TMP.NUM BETWEEN #{firstRecordIndex} AND #{lastRecordIndex}
+    </if>
+	</select>
+	
+	<select id="boardTotalCnt" resultType="int">
+        SELECT 
+        	COUNT(*) 
+        FROM
+        	BOARD
+        WHERE
+        	DEL_YN = 'N'
+    </select>
+    
+    <select id="boardDetail" resultType="HashMap">
+    	SELECT
+    		BOR_KEY_ID
+    		,TITLE
+    		,CONTENT
+    		,TO_CHAR(REG_DATE, 'YYYY-MM-DD') AS REG_DATE
+    		,VIEW_CNT
+    	FROM
+    		BOARD
+    	WHERE
+    		DEL_YN = 'N'
+    		AND BOR_KEY_ID = #{bor_key_id}
+    </select>
+    
+    <update id="incrementNttRdCnt" parameterType="String">
+    	UPDATE 
+    		BOARD
+    	SET VIEW_CNT = VIEW_CNT +1
+    	WHERE BOR_KEY_ID = #{bor_key_id}
+    </update>
+    
+    <update id="boardListDown" parameterType="String" >
+		MERGE INTO BOARD board
+			USING (
+				SELECT
+				    BASIC.*
+				FROM
+				(
+				    SELECT
+				        BOR_KEY_ID
+				        ,BOR_ORDER
+				        ,LEAD(BOR_KEY_ID) OVER (ORDER BY BOR_ORDER DESC) AS PREV_KEY_ID
+				        ,LEAD(BOR_ORDER) OVER (ORDER BY BOR_ORDER DESC) AS PREV_ORDER
+				    FROM
+				        BOARD
+				    WHERE
+				        DEL_YN = 'N'
+				) BASIC
+				WHERE BASIC.BOR_KEY_ID = #{bor_key_id}
+			)TEMP
+			ON (board.BOR_KEY_ID IN (TEMP.BOR_KEY_ID, TEMP.PREV_KEY_ID))
+			WHEN MATCHED THEN
+			    UPDATE SET board.BOR_ORDER=
+			    CASE WHEN board.BOR_KEY_ID = TEMP.BOR_KEY_ID THEN TEMP.PREV_ORDER ELSE TEMP.BOR_ORDER END
+			WHEN NOT MATCHED THEN
+			    INSERT (BOR_KEY_ID) VALUES('')
+			    WHERE 1=2
+    </update>
+    
+    <update id="boardListUp" parameterType="String" >
+		MERGE INTO BOARD board
+			USING (
+				SELECT
+				    BASIC.*
+				FROM
+				(
+				    SELECT
+				        BOR_KEY_ID
+				        ,BOR_ORDER
+				        ,LAG(BOR_KEY_ID) OVER (ORDER BY BOR_ORDER DESC) AS NEXT_KEY_ID
+				        ,LAG(BOR_ORDER) OVER (ORDER BY BOR_ORDER DESC) AS NEXT_ORDER
+				    FROM
+				        BOARD
+				    WHERE
+				        DEL_YN = 'N'
+				) BASIC
+				WHERE BASIC.BOR_KEY_ID = #{bor_key_id}
+			)TEMP
+			ON (board.BOR_KEY_ID IN (TEMP.BOR_KEY_ID, TEMP.NEXT_KEY_ID))
+			WHEN MATCHED THEN
+			    UPDATE SET board.BOR_ORDER=
+			    CASE WHEN board.BOR_KEY_ID = TEMP.BOR_KEY_ID THEN TEMP.NEXT_ORDER ELSE TEMP.BOR_ORDER END
+			WHEN NOT MATCHED THEN
+			    INSERT (BOR_KEY_ID) VALUES('')
+			    WHERE 1=2
+    </update>
+    
+    <update id="boardOrder" parameterType="HashMap">
+		UPDATE 
+			BOARD
+		SET
+    		BOR_ORDER = 
+    			CASE WHEN BOR_ORDER > (SELECT BOR_ORDER FROM BOARD WHERE BOR_KEY_ID = #{bor_key_id}) THEN BOR_ORDER-1
+        		ELSE BOR_ORDER
+        END
+    </update>
+    
+    <update id="boardDelete" parameterType="HashMap">
+		UPDATE
+			BOARD
+		SET
+			DEL_YN = 'Y'
+			,UP_DATE = SYSDATE
+			,BOR_ORDER = NULL
+		WHERE
+			BOR_KEY_ID = #{bor_key_id}
+    </update>
+	
+	<insert id="boardInsert" parameterType="HashMap">
+		INSERT INTO BOARD
+    	(
+    		BOR_KEY_ID
+    		,TITLE
+    		,CONTENT
+    		,BOR_ORDER
+    	)
+    	VALUES
+    	(
+    		#{bor_key_id}
+    		,#{title}
+    		,#{content}
+    		,(SELECT NVL(MAX(BOR_ORDER),0)+1 FROM BOARD WHERE DEL_YN ='N')
+    	)
+	</insert>
+	
+	<update id="boardModify" parameterType="HashMap">
+		UPDATE
+			BOARD
+		SET
+			TITLE = #{title}
+			,CONTENT = #{content}
+			,UP_DATE = SYSDATE
+		WHERE
+			BOR_KEY_ID = #{bor_key_id}
+	</update>
+		
+</mapper>
